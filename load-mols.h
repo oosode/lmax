@@ -9,8 +9,11 @@ namespace shootpt {
 
 struct mol {
 
+    int n;
     double *xyz;
     int natoms;
+    int conclusive;
+    int haf,hab,hbf,hbb;
     std::vector<std::string> elements;
 };    
 

@@ -26,3 +26,10 @@
 *.exe
 *.out
 *.app
+*.x
+
+# Text files
+*.txt
+
+# PDB files
+*.pdb

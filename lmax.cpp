@@ -7,8 +7,10 @@
 #include <iomanip>
 #include <iostream>
 #include <stdexcept>
+#include <stdlib.h>
 
 #include "load-mols.h"
+#include "load-data.h"
 #include "constants.h"
 
 //#define VERBOSE 1
@@ -44,28 +46,101 @@ static double*                   ts_weights = 0;
     
 ////////////////////////////////////////////////////////////////////////////////
 
-namespace linear {
-
-//----------------------------------------------------------------------------//
-
-static double* A(0);
-static double* y(0);
-static double* params(0);
-
-//----------------------------------------------------------------------------//
-
-void allocate()
+double cv1(const int n)
 {
-//    A = new double[training_set.size()*model_type::nparams()];
-//    y = new double[training_set.size()];
 
-//    params = new double[model_type::nparams()];
+    shootpt::mol ts = training_set[n];
+    double cv = 0;
+    double r0 = 2.38;
+
+    int beta[3] = {5867,5868,5869}; // 5868, 5869, 5870
+    int gammap  = 5870; // 5871
+
+    for (size_t i=0; i<3; ++i) {
+
+        double d2 = 0;
+        double  d = 0;
+
+        for (size_t l=0; l<3; ++l) {
+
+            d = ts.xyz[gammap*3+l]-ts.xyz[beta[i]*3+l];
+	    d2 += d*d;
+        
+        }
+
+	d = sqrt (d2);
+
+        double num = 1 - pow(d/r0,6.0);
+        double den = 1 - pow(d/r0,12.0);
+
+        cv += num/den;        
+
+    }
+    
+    return cv;
 }
 
+double cv2(const int n)
+{
 
-} // namespace linear
+    shootpt::mol ts = training_set[n];
+    double cv = 0;
+    double r0 = 2.38;
 
-////////////////////////////////////////////////////////////////////////////////
+    int waterstart = 5875; //5876
+    int waterend   = 55749; // 55750
+
+    
+    int gammao[3] = {5871,5872,5873}; // 5872, 5873, 5874
+    int gammap  = 5870; // 5871
+
+    for (size_t i=0; i<3; ++i) {
+
+        double d2 = 0;
+        double  d = 0;
+
+        for (size_t l=0; l<3; ++l) {
+
+            d = ts.xyz[gammap*3+l]-ts.xyz[gammao[i]*3+l];
+            d2 += d*d;
+
+	}
+	
+	d = sqrt (d2);
+
+	double num = 1 - pow(d/r0,6.0);
+	double den = 1 - pow(d/r0,12.0);
+
+	cv += num/den;
+
+    }
+
+    for (size_t i=waterstart; i<waterend; i+=3) {
+
+        double d2 = 0;
+        double  d = 0;
+
+        for (size_t l=0; l<3; ++l) {
+
+            d = ts.xyz[gammap*3+l]-ts.xyz[i*3+l];
+            d2 += d*d;
+
+        }
+
+        if (d2>64) continue;
+
+        d = sqrt (d2);
+
+        double num = 1 - pow(d/r0,6.0);
+        double den = 1 - pow(d/r0,12.0);
+
+        cv += num/den;
+
+    }
+
+    return cv;
+}
+
 
 } // namespace
 
@@ -104,112 +179,186 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    //Get accepted/rejected 
+    char basin_file[64];
+    char acc_file[64];
+
+    sprintf(acc_file, "acc.txt");
+    sprintf(basin_file, "basin_evals.txt");
+
+    shootpt::load_acc(training_set, acc_file);
+    shootpt::load_basin(training_set, basin_file);
+
     // Get CVs
+    int M = 2; // number of CVs
+    double qA[M][training_set.size()], qB[M][training_set.size()];
+    double zA[M][training_set.size()], zB[M][training_set.size()];
+    double qmax[M], qmin[M], qspan[M];
+    double qmaxA[M], qmaxB[M], qminA[M], qminB[M];
+
+    size_t NA = 0;
+    size_t NB = 0;
 
     for (size_t n = 0; n < training_set.size(); ++n) {
-    
-        training_set[n].xyz
+ 
+	shootpt::mol ts = training_set[n];
 
+        if (ts.conclusive == 1) {
+
+	    if (ts.haf == 1 && ts.hbb == 1) {
+		qA[0][NA] = cv1(n);
+		std::cout << "qA " << n << " " << qA[0][NA] << std::endl;
+		qA[1][NA] = cv2(n);
+		NA++;
+	    } else if (ts.hbf == 1 && ts.hab == 1) {
+		qB[0][NB] = cv1(n);
+	        std::cout << "qB " << n << " " << qB[0][NB] << std::endl;
+		qB[1][NB] = cv2(n);
+		NB++;
+	    }
+	}
     }
 
-    
-    
-     
-    
-    
-    
-    
-    
+ 
+    for (size_t i = 0; i < M; ++i) {
+//        if (ts.haf == 1 && ts.hbb == 1) {
+            qminA[i] = qA[i][0];
+	    qmaxA[i] = qA[i][0];
+	    for (size_t j = 0; j < NA; ++j) {
+                if (qA[i][j] < qminA[i]) {
+                    qminA[i] = qA[i][j];
+                }
+                if (qA[i][j] > qmaxA[i]) {
+                    qmaxA[i] = qA[i][j];
+		}
+            }
+//	} else if (ts.hbf == 1 && ts.hab == 1) {
+            qminB[i] = qB[i][0];
+	    qmaxB[i] = qB[i][0];
+            for (size_t j = 0; j < NB; ++j) {
+                if (qB[i][j] < qminB[i]) {
+                    qminB[i] = qB[i][j];
+                }
+                if (qB[i][j] > qmaxB[i]) {
+                    qmaxB[i] = qB[i][j];
+                }
+            }
+//	}
+    }
 
+    printf("\nCV qmin  qmax  qspan\n");
+    for (size_t i = 0; i < M; ++i) {
+        if (qmaxA[i] > qmaxB[i]) {
+            qmax[i] = qmaxA[i];
+        } else {
+            qmax[i] = qmaxB[i];
+        }
+        if (qminA[i] < qminB[i]) {
+            qmin[i] = qminA[i];
+        } else{
+            qmin[i] = qminB[i];
+        }
+        qspan[i] = qmax[i] - qmin[i];
+        printf("\n %zu %.3f %.3f %.3f ", i, qmin[i], qmax[i], qspan[i]);
+    }
+
+    printf("\n\n  REDUCED VARIABLES: Z = (Q-Qmin)/(Qmax-Qmin) \n");
+    printf("\n        Z IN [0, 1]: Q = Z(Qmax-Qmin)+Qmin\n");    
+    for (size_t i = 0; i < M; ++i) {
+        for (size_t j = 0; j < NA; ++j) {
+            zA[i][j] = (qA[i][j]-qmin[i])/(qmax[i]-qmin[i]);
+        }
+        for (size_t j = 0; j < NB; ++j) {
+            zB[i][j] = (qB[i][j]-qmin[i])/(qmax[i]-qmin[i]);
+        }
+    }  
+    
+    FILE *fa = fopen("A.txt", "w");
+
+    fprintf(fa,"%d\n",NA);
+    for(int j=0; j<NA; j++){
+      fprintf(fa, "\n");
+      for(int i=0; i<M; i++){
+        fprintf(fa, "%f ", zA[i][j]);
+      }
+    }
+    fclose(fa);
+
+    FILE *fb = fopen("B.txt", "w");
+
+    fprintf(fb, "%d\n", NB);
+    for(int j=0; j<NB; j++){
+      fprintf(fb, "\n");
+      for(int i=0; i<M; i++){
+        fprintf(fb, "%f ", zB[i][j]);
+      }
+    }
+    fclose(fb);
+
+    printf("\n\n  BIC = LN(N)/2 = %.3f\n", 0.5*log((double)(NA+NB)));    
+
+    printf("\n\n PREPARE AND COMPILE MAXIMIZATION ROUTINE \n");
+
+    FILE *fm = fopen("globals.txt","w");
+    fprintf(fm, "\n#define A %d", NA);
+    fprintf(fm, "\n#define B %d", NB);
+    fprintf(fm, "\n#define m %d\n", 1);
+    fclose(fm);
+
+    system("gcc -lm maximizePBnew.c");
+    system("cp a.out max.exe");
+    
+    int imax;
+    double rc, alpha[M], lnL, temp;
+    double best1[M][1+1+1], best2[M][M][1+2+1];
+    double best3[M][M][M][1+3+1];
+
+    int m = 1;
+
+    for(int i=0; i<m; i++){
+      FILE *zlist = fopen("zlist.txt", "w");
+      fprintf(zlist, "\n %d %d\n", NA, NB);
+      for(int j=0; j<NA; j++){
+        fprintf(zlist, "\n %f ", zA[i][j]);
+      }
+      for(int j=0; j<NB; j++){
+        fprintf(zlist, "\n %f ", zB[i][j]);
+      }
+      fclose(zlist);
+      system("./max.exe > a1.txt");
+      fflush(stdout);
+      FILE *answer = fopen("answer.txt", "r");
+      fscanf(answer, "%lf ", &temp);
+      lnL = temp;
+      best1[i][m] = lnL;
+      if (i==1) {
+        system("cp zlist.txt z-1.txt");
+        imax = 1;
+      }else{
+        if(best1[i][m] > best1[imax][m]){
+  	  system("cp zlist.txt z-1.txt");
+	  imax = i;
+        }
+      }
+      printf("\n rxncoor %d %f", i, lnL);
+      for (int j=0; j<m; j++){
+        fscanf(answer, "%lf ", &temp);
+        alpha[j] = temp;
+        printf(" %.3f", alpha[j]);
+        best1[i][j] = alpha[j];
+      }
+      fclose(answer);
+    }
+    printf("\n ");
+    printf("\n best rxncoor %d %f", imax, best1[imax][m]);
+    for(int j=0; j<m; j++){
+      printf(" %.3f", best1[imax][j]);
+    }
 
 
     std::cout << "Final parameters:" << std::endl;
-//    for(size_t i = 0; i < num_nonlinear_params; ++i)
-//        std::cout << all_atm_types[i]<< ' ' << s->x->data[i] << std::endl;
-/*
-    double err_L2(0), err_wL2(0), err_Linf(0);
-    double err_L2_lo(0), err_Linf_lo(0), nlo(0);
-
-    const char fm[] = "fit-output.txt";
-    FILE *fs = fopen(fm, "w");
-    fprintf(fs,"%6s %15s %15s %15s\n","index","model","training-set","delta");
-
-    double emin = 1.0e+6;
-    for (size_t n = 0; n < training_set.size(); ++n) {
-        double mmm[model_type::nparams()];
-
-///////////////////////////
-        int nnlin = model_type::num_nonlinear_params;
-        int ncoef = model_type::nparams();
-
-        double tmp[nnlin+ncoef];
-
-        for(size_t j=0; j<fit[0]->npar; ++j)
-            tmp[j] = GA->parent[0][j];
 
 
-        double data[nnlin];
-        std::copy(tmp, tmp + nnlin , data);
-
-        model.set_nonlinear_parameters(data);
-
-        if (model.nonlinear_parameters_out_of_range())
-          return 1.0e+6;
-
-        double poly[ncoef];
-        std::copy(tmp + nnlin, tmp + nnlin + ncoef, poly);
-
-        model.set(poly);
-        double chisq(0);
-
-///////////////////////////
-
-        double E_m = training_set[n].energy_total_com;
-        double E_r = training_set[n].energy_total_ref;
-//        double emin = 0.0;
-
-//        const double E_model = model.value(training_set[n].xyz);
-        const double delta = E_m - E_r;
-        if (std::abs(delta) > err_Linf)
-            err_Linf = std::abs(delta);
-
-        err_L2 += delta*delta;
-        err_wL2 += ts_weights[n]*delta*delta;
-
-        if (E_r - E_min < E_range) {
-            nlo += 1.0;
-            err_L2_lo += delta*delta;
-            if (std::abs(delta) > err_Linf_lo)
-                err_Linf_lo = std::abs(delta);
-        }
-
-        fprintf(fs,"%06d %15.10f %15.10f %15.10f\n",n,E_m,E_r,delta);
-    }
-
-    fclose(fs);
-
-    err_L2 /= training_set.size();
-    err_wL2 /= training_set.size();
-
-    err_L2_lo /= nlo;
-
-    std::cout << "      err[L2] = " << std::sqrt(err_L2) << "\n"
-              << "     err[wL2] = " << std::sqrt(err_wL2) << "\n"
-              << "    err[Linf] = " << err_Linf << "\n"
-              << "  err[L2,low] = " << err_L2_lo << "\n"
-              << "err[Linf,low] = " << err_Linf_lo
-              << std::endl;
-
-    // output metadata
-    std::cout << "\n"
-              << "Degree polynomial = " << degree << "\n"
-              << "Energy range      = " << E_range << "\n"
-              << "Number of configs = " << training_set.size() << "\n"
-              << std::endl;
-
-*/
-
-//    MPI_Finalize();
     return 0;
 }
 

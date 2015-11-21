@@ -18,13 +18,14 @@ size_t load_mols(std::vector<mol>& ts)
 
     // while loop over all relevant shootpt files (PDB)
 //    while ()
-    int nshoots;
+    size_t nshoots = 0;
 
-    for (int i=115; i<116; i++)
+    for (int i=110; i<125; i++)
     {
 
+//      std::cout << i << std::endl;
       char filename[64];
-      sprintf(filename, "%d.shootpt.pdb",i);
+      sprintf(filename, "shootpt/%d.shootpt.pdb",i);
 //      const char* filename = "115.shootpt.pdb";
 //      assert(filename);
     
@@ -68,6 +69,7 @@ size_t load_mols(std::vector<mol>& ts)
 
 
       mol m;
+      m.n = i;
       m.natoms = natoms;
       m.xyz = new double[natoms*3];
 //          m.energy_total_ref = energy_total_ref;
@@ -76,7 +78,8 @@ size_t load_mols(std::vector<mol>& ts)
       m.elements = elements;
 
       ts.push_back(m);
-
+//      std::cout << "hello" << std::endl;
+//      std::cout << m.n << std::endl;
         
       ++nshoots;
     }

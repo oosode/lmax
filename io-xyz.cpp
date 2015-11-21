@@ -190,6 +190,9 @@ void load_pdb(std::istream&             is,
     elements.reserve(natoms);
     
     std::getline(is, comment);
+//    std::string str2 ("CRYST1");
+    while (comment.find("CRYST1")!=0) std::getline(is, comment);
+    
 //    std::cout << comment << std::endl;
     
     size_t lineno(2), n(0);
