@@ -13,6 +13,7 @@ struct mol {
     double *xyz;
     int natoms;
     int conclusive;
+    int accepted;
     int haf,hab,hbf,hbb;
     std::vector<std::string> elements;
 };    

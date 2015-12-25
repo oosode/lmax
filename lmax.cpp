@@ -200,6 +200,8 @@ double cv4(const int n)
 
         double da,db,da2,db2;
 
+        da2=0.0; db2=0.0;
+
         for (size_t l=0; l<3; ++l) {
 
             da = ts.xyz[d154o1*3+l]-ts.xyz[i*3+l];
@@ -298,7 +300,7 @@ int main(int argc, char** argv)
     shootpt::load_basin(training_set, basin_file);
 
     // Get CVs
-    int M = 3; // number of CVs
+    int M = 4; // number of CVs
     double qA[M][training_set.size()], qB[M][training_set.size()];
     double zA[M][training_set.size()], zB[M][training_set.size()];
     double qmax[M], qmin[M], qspan[M];
@@ -308,24 +310,28 @@ int main(int argc, char** argv)
     size_t NB = 0;
 
     for (size_t n = 0; n < training_set.size(); ++n) {
- 
+	printf("%zu\n",n); 
 	shootpt::mol ts = training_set[n];
 
-        if (ts.conclusive == 1) {
+	printf("conclusive %d\n",ts.conclusive);
+//        if (ts.conclusive == 1) {
+	if (ts.accepted == 1) {
 
-	    if (ts.haf == 1) {
+	    if (ts.hab == 1) {
 //	    if (ts.haf == 1 && ts.hbb == 1) {
 		qA[0][NA] = cv1(n);
 		qA[1][NA] = cv2(n);
 		qA[2][NA] = cv3(n);
-		std::cout << " q(" << n << ") cv1,cv2,cv3 " << qA[0][NA] << " " << qA[1][NA] << " " << qA[2][NA] << std::endl;
+		qA[3][NA] = cv4(n);
+		std::cout << " q(" << n << ") cv1,cv2,cv3,cv4 " << qA[0][NA] << " " << qA[1][NA] << " " << qA[2][NA] << " " << qA[3][NA] << std::endl;
 		NA++;
-	    } else if (ts.hbf == 1) {
+	    } else if (ts.hbb == 1) {
 //	    } else if (ts.hbf == 1 && ts.hab == 1) {
 		qB[0][NB] = cv1(n);
 		qB[1][NB] = cv2(n);
 		qB[2][NB] = cv3(n);
-		std::cout << " q(" << n << ") cv1,cv2,cv3 " << qB[0][NB] << " " << qB[1][NB] << " " << qB[2][NB] << std::endl;
+		qB[3][NB] = cv4(n);
+		std::cout << " q(" << n << ") cv1,cv2,cv3,cv4 " << qB[0][NB] << " " << qB[1][NB] << " " << qB[2][NB] << " " << qB[2][NB] << std::endl;
 		NB++;
 	    }
 	}
@@ -386,7 +392,7 @@ int main(int argc, char** argv)
     
     FILE *fa = fopen("A.txt", "w");
 
-    fprintf(fa,"%d\n",NA);
+    fprintf(fa,"%zu\n",NA);
     for(int j=0; j<NA; j++){
       fprintf(fa, "\n");
       for(int i=0; i<M; i++){
@@ -397,7 +403,7 @@ int main(int argc, char** argv)
 
     FILE *fb = fopen("B.txt", "w");
 
-    fprintf(fb, "%d\n", NB);
+    fprintf(fb, "%zu\n", NB);
     for(int j=0; j<NB; j++){
       fprintf(fb, "\n");
       for(int i=0; i<M; i++){
@@ -420,7 +426,7 @@ int main(int argc, char** argv)
 
     for (int i=0; i<M; i++){
       FILE *zlist = fopen("zlist.txt", "w");
-      fprintf(zlist, "\n %d %d\n", NA, NB);
+      fprintf(zlist, "\n %zu %zu\n", NA, NB);
       for (int j=0; j<NA; j++) {
         fprintf(zlist, "\n %f ", zA[i][j]);
       }
@@ -435,12 +441,12 @@ int main(int argc, char** argv)
       FILE *answer = fopen("answer.txt", "r");
       fscanf(answer, "%lf ", &temp);
       lnL = temp;
-      best1[i][m] = lnL;
+      best1[i][m+1] = lnL;
       if (i==0) {
         system("cp zlist.txt z-1.txt");
         imax = 0;
       }else{
-        if(best1[i][m] > best1[imax][m]){
+        if(best1[i][m+1] > best1[imax][m+1]){
           system("cp zlist.txt z-1.txt");
           imax = i;
         }
@@ -456,10 +462,12 @@ int main(int argc, char** argv)
 
       z[i]  = -alpha[0]/alpha[1];
       rc[i] = z[i]*qspan[i]+qmin[i];
+
+      printf("\n RC(%d) = i = %15.10f",i,rc[i]);
       
     }
     printf("\n ");
-    printf("\n best rxncoor %d %f", imax, best1[imax][m]);
+    printf("\n best rxncoor %d %f", imax, best1[imax][m+1]);
     for(int j=0; j<=m; j++) {
       printf(" %.3f", best1[imax][j]);
     }
@@ -469,7 +477,7 @@ int main(int argc, char** argv)
     for (int i=0; i<M; i++) {
       for (int k=i+1; k<M; k++) {
         FILE *zlist = fopen("zlist.txt", "w");
-	fprintf(zlist, "\n %d %d\n", NA, NB);
+	fprintf(zlist, "\n %zu %zu\n", NA, NB);
 	for (int j=0; j<NA; j++) {
 	  fprintf(zlist, "\n %f %f", zA[i][j], zA[k][j]);
 	}
@@ -514,11 +522,15 @@ int main(int argc, char** argv)
 	}
 	fclose(answer);
 
+	printf("\n y = %7.4f*(x - %7.4f) + %7.4f + %7.4f",-alpha[1]*qspan[k]/alpha[2]/qspan[i],
+							  qmin[i],
+							  alpha[0]*qspan[k]/alpha[2],
+							  qmin[k]);
 	double z1 = (-alpha[0]-alpha[2]*z[k])/alpha[1];
-	printf("\n RC(%d,%d) = i*= %15.10f   k = %15.10f",i,k,z1*qspan[i]+qmin[i],rc[k]);
+	printf("\n RC(%d,%d): i*= %15.10f   k = %15.10f",i,k,z1*qspan[i]+qmin[i],rc[k]);
 
         double z2 = (-alpha[0]-alpha[1]*z[k])/alpha[2];
-        printf("\n RC(%d,%d) = i = %15.10f   k*= %15.10f",i,k,rc[i],z2*qspan[k]+qmin[k]);
+        printf("\n RC(%d,%d): i = %15.10f   k*= %15.10f",i,k,rc[i],z2*qspan[k]+qmin[k]);
 
       }
     }

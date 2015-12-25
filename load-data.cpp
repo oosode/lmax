@@ -45,7 +45,7 @@ void load_acc(std::vector<mol>& ts, char filename[64])
 
 
         if (n==ts[i].n) {
-//	    std::cout << "hello " << result << std::endl;
+	    std::cout << "hello " << n << " "  << result << std::endl;
 	    ts[i].conclusive=1; 
 	    if (result.compare("inconclusive") == 0) ts[i].conclusive=0; 
 	}
@@ -117,6 +117,10 @@ void load_basin(std::vector<mol>& ts, char filename[64])
             }   
 
 	}
+	
+	ts[i].accepted=0;
+	if (haf==1 && hbb==1) ts[i].accepted=1;
+	if (hbf==1 && hab==1) ts[i].accepted=1;
 
         if (iss.fail()) {
 //	    std::cout << "HelLL" << std::endl;

@@ -1,6 +1,6 @@
 CXX = g++
 
-DEBUG = -g
+DEBUG = -g 
 #DEBUG = -g
 CXXFLAGS = -Wall $(DEBUG) -I/opt/local/include -L/opt/local/lib -std=c++11 
 

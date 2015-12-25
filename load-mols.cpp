@@ -20,7 +20,7 @@ size_t load_mols(std::vector<mol>& ts)
 //    while ()
     size_t nshoots = 0;
 
-    for (int i=1; i<=31; i++)
+    for (int i=1; i<=46; i++)
     {
 
 //      std::cout << i << std::endl;
